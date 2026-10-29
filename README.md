@@ -1,10 +1,11 @@
 # Big Data Weather Analytics Pipeline
 
-A streaming big-data project that ingests weather records from a CSV file, publishes them to Kafka, processes the live stream with Apache Spark, and stores summarized analytical results in MySQL for reporting and ranking.
+A streaming big-data project that ingests weather records from a CSV file, uses Apache NiFi for data cleaning and transformation, publishes the processed data to Kafka, and stores aggregated analytical results in MySQL.
 
 This repository demonstrates a practical end-to-end data pipeline using:
 
 - Python
+- Apache NiFi
 - Kafka
 - Apache Spark
 - MySQL
@@ -18,7 +19,7 @@ The project analyzes weather and air-quality data by country and produces aggreg
 - Air quality metrics
 - Pollution ranking
 
-The data pipeline transforms raw weather observations into usable analytical outputs that can support monitoring, comparison, and decision-making.
+The data pipeline transforms raw weather observations into usable analytical outputs that support monitoring, comparison, and decision-making.
 
 ## Business Use Case
 
@@ -33,16 +34,21 @@ The project is designed for climate and environmental analytics. It helps answer
 
 ```mermaid
 flowchart LR
-    A[WeatherM.csv\nRaw weather dataset] --> B[producer.py\nPython Kafka Producer]
-    B --> C[Kafka Broker\nweatherRaw / weathercc topic]
-    C --> D[spark.py\nSpark Structured Streaming]
-    D --> E[Data transformation\nJSON parsing + country normalization]
-    E --> F[Aggregations\nWind / Air Quality / Pollution Score]
-    F --> G[MySQL Database\nweatherdb]
+    A[WeatherM.csv
+Raw weather dataset] --> B[Apache NiFi
+Clean / transform / route data]
+    B --> C[Kafka Broker
+weatherRaw / weathercc topic]
+    C --> D[spark.py
+Spark Structured Streaming]
+    D --> E[Aggregations
+Wind / Air Quality / Pollution Score]
+    E --> F[MySQL Database
+weatherdb]
 
-    G --> H[wind_stats]
-    G --> I[air_quality]
-    G --> J[pollution_rank]
+    F --> G[wind_stats]
+    F --> H[air_quality]
+    F --> I[pollution_rank]
 ```
 
 ## Detailed Architecture
@@ -50,30 +56,37 @@ flowchart LR
 ```mermaid
 flowchart TD
     subgraph Source
-        CSV[CSV File\nWeatherM.csv]
+        CSV[CSV File
+WeatherM.csv]
     end
 
     subgraph Ingestion
-        PKG[Python Producer\nKafkaProducer]
-        KAFKA[Kafka Topic\nweatherRaw]
+        NIFI[Apache NiFi
+Validate, clean, transform, route]
+        KAFKA[Kafka Topic
+weatherRaw]
     end
 
     subgraph Processing
-        SPARK[Spark Stream\nStructured Streaming]
-        PARSE[Parse JSON values\nCreate schema]
-        CLEAN[Normalize country names\nTrim / uppercase / initcap]
+        SPARK[Spark Stream
+Structured Streaming]
+        PARSE[Parse JSON values
+Create schema]
+        CLEAN[Normalize country names
+Trim / uppercase / initcap]
         AGG[Aggregate by country]
     end
 
     subgraph Storage
-        MYSQL[(MySQL database\nweatherdb)]
+        MYSQL[(MySQL database
+weatherdb)]
         TABLE1[wind_stats]
         TABLE2[air_quality]
         TABLE3[pollution_rank]
     end
 
-    CSV --> PKG
-    PKG --> KAFKA
+    CSV --> NIFI
+    NIFI --> KAFKA
     KAFKA --> SPARK
     SPARK --> PARSE
     PARSE --> CLEAN
@@ -89,14 +102,16 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant User as Data Source
+    participant NiFi as Apache NiFi
     participant Producer as producer.py
     participant Kafka as Kafka Broker
     participant Spark as spark.py
     participant MySQL as MySQL weatherdb
 
-    User->>Producer: Load WeatherM.csv
-    Producer->>Kafka: Send each record as JSON message
-    Kafka-->>Spark: Stream weather records
+    User->>NiFi: Load WeatherM.csv
+    NiFi->>NiFi: Clean, normalize, and transform records
+    NiFi->>Kafka: Publish transformed records
+    Kafka-->>Spark: Stream processed weather records
     Spark->>Spark: Parse JSON with schema
     Spark->>Spark: Normalize country names
     Spark->>Spark: Group by country and compute KPIs
@@ -109,17 +124,31 @@ sequenceDiagram
 ## Data Flow
 
 1. Raw weather data is loaded from the CSV file.
-2. Each row is converted into a JSON record.
-3. The producer pushes records into a Kafka topic.
-4. Spark reads the Kafka stream in real time.
-5. Data is parsed using a predefined schema.
-6. Country values are cleaned and standardized.
-7. Aggregations are computed for each country.
-8. Final tables are written to MySQL.
+2. Apache NiFi reads the dataset and applies cleaning and transformation logic.
+3. Records are formatted into a consistent structure for downstream processing.
+4. The transformed data is sent to Kafka.
+5. Spark reads the Kafka stream in real time.
+6. Data is parsed using a predefined schema.
+7. Country values are cleaned and standardized.
+8. Aggregations are computed for each country.
+9. Final tables are written to MySQL.
 
 ## Main Components
 
-### 1. Data Producer
+### 1. Data Transformation Layer
+
+This project uses Apache NiFi as the transformation layer before the data reaches Kafka. NiFi is responsible for:
+
+- reading the raw CSV data
+- validating and cleaning records
+- normalizing field names and values
+- transforming the data into a consistent JSON-ready structure
+- routing the processed data to Kafka topics
+
+This stage is important because it prepares the data for downstream streaming and analytical processing.
+
+### 2. Data Producer
+
 File: `producer.py`
 
 This script:
@@ -138,7 +167,8 @@ producer = KafkaProducer(
 )
 ```
 
-### 2. Streaming Processor
+### 3. Streaming Processor
+
 File: `spark.py`
 
 This script:
@@ -156,7 +186,8 @@ It computes three main analytical outputs:
 - `air_quality`
 - `pollution_rank`
 
-### 3. Database Schema
+### 4. Database Schema
+
 File: `queries.txt`
 
 Creates the database and tables used by the pipeline:
@@ -214,6 +245,7 @@ This score is then ordered in descending order to rank countries by pollution se
 
 - Python 3.x
 - Pandas
+- Apache NiFi
 - Kafka Producer API
 - Apache Spark Structured Streaming
 - Kafka Connector for Spark
@@ -246,6 +278,7 @@ Before running the pipeline, make sure the following are available:
 
 - Java JDK 11+
 - Apache Kafka
+- Apache NiFi
 - Apache Spark
 - MySQL Server
 - Python dependencies
@@ -321,15 +354,23 @@ Create the Kafka topic if needed:
 bin/kafka-topics.sh --create --topic weatherRaw --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
-### 3. Run the Producer
+### 3. Start Apache NiFi
+Launch Apache NiFi and build the flow to:
+
+- read the source CSV file
+- clean and transform the incoming weather records
+- normalize field names and values
+- send the structured output to Kafka
+
+### 4. Run the Producer
 
 ```bash
 python producer.py
 ```
 
-This will read the CSV file and send records to Kafka.
+This script can be used to push the generated records to Kafka when needed, especially if the NiFi flow is not configured to send the data directly.
 
-### 4. Run the Spark Streaming Job
+### 5. Run the Spark Streaming Job
 
 ```bash
 python spark.py
@@ -337,7 +378,7 @@ python spark.py
 
 The Spark job listens for Kafka messages, aggregates the latest batch, and writes to MySQL.
 
-### 5. Query the Results
+### 6. Query the Results
 
 ```sql
 SELECT * FROM weatherdb.wind_stats;
@@ -367,11 +408,12 @@ The incoming weather records contain fields such as:
 
 ## Notes and Observations
 
-- The project is a classic streaming pipeline pattern: ingest → process → analyze → store.
+- The project follows a streaming architecture: ingest → transform → process → analyze → store.
+- Apache NiFi acts as the transformation and routing layer, ensuring data is cleaned and ready for Kafka ingestion.
 - The producer sends one weather record per Kafka message.
 - The Spark job waits for a short inactivity period before processing a batch, allowing grouped analysis.
 - The MySQL tables are overwritten each cycle, which makes the database act like a fresh report snapshot.
-- The project is useful as a teaching example for real-time analytics and streaming pipelines.
+- The project is useful as a teaching example for real-time analytics and streaming processing.
 
 ## Potential Improvements
 
@@ -384,7 +426,7 @@ The incoming weather records contain fields such as:
 
 ## Summary
 
-This project demonstrates how to build a scalable weather analytics pipeline using modern big-data technologies. It collects raw environmental data, streams it through Kafka, analyzes it with Apache Spark, and stores aggregated insights in MySQL. The result is a practical real-time processing system that turns raw weather observations into meaningful business intelligence.
+This project demonstrates how to build a scalable weather analytics pipeline using modern big-data technologies. It ingests raw environmental data, transforms it through Apache NiFi, streams the processed records through Kafka, analyzes them with Spark, and stores the final insights in MySQL for decision-making.
 
 ## License
 
@@ -397,5 +439,5 @@ If you want, I can also create a more polished version of this README for GitHub
 - a landing page style banner
 - screenshots/diagram assets
 - installation steps tailored for Windows/Linux/macOS
-- a section for troubleshooting common Kafka and Spark issues
+- a section for troubleshooting common Kafka, NiFi, and Spark issues
 - a sample dashboard design for the analytics output
