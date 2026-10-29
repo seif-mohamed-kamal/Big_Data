@@ -1,0 +1,40 @@
+CREATE TABLE weatherdb.wind_stats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Country VARCHAR(100),
+    avg_wind_kph DOUBLE,
+    max_wind_kph DOUBLE,
+    min_wind_kph DOUBLE,
+    avg_gust_kph DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE weatherdb.air_quality (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Country VARCHAR(100),
+    avg_PM10 DOUBLE,
+    avg_O3 DOUBLE,
+    avg_NO2 DOUBLE,
+    avg_SO2 DOUBLE,
+    avg_CO DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE weatherdb.pollution_rank (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    Country VARCHAR(100),
+    pollution_score DOUBLE,
+    avg_PM10 DOUBLE,
+    avg_NO2 DOUBLE,
+    avg_O3 DOUBLE,
+    avg_SO2 DOUBLE,
+    avg_CO DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE DATABASE weatherdb
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_general_ci;
+
+CREATE USER 'seif' IDENTIFIED BY '123';
+GRANT ALL PRIVILEGES ON weatherdb.* TO 'seif';
+FLUSH PRIVILEGES;
